@@ -1,3 +1,697 @@
-# Doist
+# Doist - Developer Guide
 
-Hello this is awesome thank you
+By : `W13-B4`  &nbsp;&nbsp;&nbsp;&nbsp; Since: `Jan 2017`  &nbsp;&nbsp;&nbsp;&nbsp; Licence: `MIT`
+
+---
+
+<br>
+
+
+## Table of contents
+
+- [Setting Up](#setting-up)
+- [Design](#design)
+- [Implementation](#implementation)
+- [Testing](#testing)
+- [Dev Ops](#dev-ops)
+- [Appendix A: User Stories](#appendix-a--user-stories)
+- [Appendix B: Use Cases](#appendix-b--use-cases)
+- [Appendix C: Non Functional Requirements](#appendix-c--non-functional-requirements)
+- [Appendix D: Glossary](#appendix-d--glossary)
+- [Appendix E : Product Survey](#appendix-e--product-survey)
+
+<br>
+
+
+## Introduction
+<p>Doist is a task manager that can simplify your life with the press of a button! Designed for users who like to use the keyboard, Doist can accept natural language commands to help you keep track of all your daily tasks.</p>
+<p>This developer guide aims to give developers a nut and bolts view of Doist, to encourage and facilitate contribution to the development of this application.</p>
+
+
+<br>
+
+
+## Setting up
+
+### 1. Prerequisites
+
+1. **JDK `1.8.0_60`**  or later<br>
+
+    > This app will not work with earlier versions of Java 8.
+
+2. **Eclipse** IDE
+3. **e(fx)clipse** plugin for Eclipse (Follow the instructions given at
+   [this page](http://www.eclipse.org/efxclipse/install.html#for-the-ambitious))
+4. **Buildship Gradle Integration** plugin from the Eclipse Marketplace
+5. **Checkstyle Plug-in** plugin from the Eclipse Marketplace
+
+
+### 2. Importing the project into Eclipse
+
+1. Fork this repo, and clone the fork to your computer
+2. Open Eclipse (Note: Ensure you have installed the **e(fx)clipse** and **buildship** plugins as given
+   in the prerequisites above)
+3. Click `File` > `Import`
+4. Click `Gradle` > `Gradle Project` > `Next` > `Next`
+5. Click `Browse`, then locate the project's directory
+6. Click `Finish`
+
+  > * If you are asked whether to 'keep' or 'overwrite' config files, choose to 'keep'.
+  > * Depending on your connection speed and server load, it can even take up to 30 minutes for the set up to finish
+      (This is because Gradle downloads library files from servers during the project set up process)
+  > * If Eclipse auto-changed any settings files during the import process, you can discard those changes.
+
+### 3. Configuring Checkstyle
+1. Click `Project` -> `Properties` -> `Checkstyle` -> `Local Check Configurations` -> `New...`
+2. Choose `External Configuration File` under `Type`
+3. Enter an arbitrary configuration name e.g. addressbook
+4. Import checkstyle configuration file found at `config/checkstyle/checkstyle.xml`
+5. Click OK once, go to the `Main` tab, use the newly imported check configuration.
+6. Tick and select `files from packages`, click `Change...`, and select the `resources` package
+7. Click OK twice. Rebuild project if prompted
+
+> Note to click on the `files from packages` text after ticking in order to enable the `Change...` button  
+
+### 4. Troubleshooting project setup
+
+* **Problem**: Eclipse reports compile errors after new commits are pulled from Git
+    - *Reason*: Eclipse fails to recognize new files that appeared due to the Git pull.
+    - *Solution*: Refresh the project in Eclipse:
+  Right click on the project (in Eclipse package explorer), choose `Gradle` -> `Refresh Gradle Project`.
+
+* **Problem**: Eclipse reports some required libraries missing 
+    - *Reason*: Required libraries may not have been downloaded during the project import.
+    - *Solution*: [Run tests using Gradle](UsingGradle.md) once (to refresh the libraries).
+
+<br>
+
+
+## Design
+
+### 1. Architecture
+
+<img src="images/Architecture.png" width="600"><br>
+_Figure 2.1.1 : Architecture Diagram_
+
+The **_Architecture Diagram_** given above explains the high-level design of Doist. Each of the components illustrated pertain to a specfic aspect of the App, and are briefly discussed below.
+
+#### `Main`
+The `Main` component is the heart of the App. It is responsible for
+- initializing other components (`Model`, `Logic`, `UI`) in the correct order and loading data from local storage when the app launches.  
+- terminating other components when Doist is shut down.
+
+#### [`UI`](#2-ui-component)
+The `UI` component serves as the eyes and ears of the App. It handles all user interactions, as well as displaying information to the user.
+
+#### [`Logic`](#3-logic-component)
+The `Logic` component is the brains behind the App. It takes charge of parsing the user input and executing the commands.
+
+#### [`Model`](#4-model-component)
+The `Model` component is the spine around which the App has been built. It represents the data that Doist operates on and also supports the operations on the same.
+
+#### [`Storage`](#5-storage-component)
+The `Storage` component handles the App's memory. It takes charge of reading data from, and writing data to, the hard disk.
+
+#### `Commons`
+The `Commons` component is akin to the nervous system of the App. It contains a collection of classes used by multiple other components. The following are 2 representatives.
+- EventsCenter : supports the communication among different components using events
+- LogsCenter : enables writing log messages to the log file.
+
+### 2. UI component
+The `UI` is the main form of interaction between Doist and the user. `UI` executes commands entered by the user and updates itself to reflect the results of these commands. It works closely with `Logic` component to execute commands, and also responds to events raised internally by Doist.
+
+The following diagram represents the structure of the `UI` component  
+<br><img src="images/UIComponentClassDiagram.PNG" width="800"><br>
+
+Here are some of the key files in the `Ui` component:
+- [`UI.java`](../src/main/java/seedu/doist/ui/Ui.java):  contains an `interface` that defines two operations that control the UI of the App. 
+    These operations are defined using different methods (API).  
+    Some representative methods are listed here:  
+    ```java  
+    void start(Stage primaryStage)
+    void stop()  
+    ```  
+- `UiManager.java`: contains a `class` that implements the operations specified in `Ui.java`.
+- `MainWindow.java`: contains a `class` that represents the Main Window viewed by the user.
+- `CommandBox.java`: contains a `class` that represents the Command Box used by the user to enter commands.
+
+### 3. Logic component
+The `Logic` component handles the execution of the commands entered by the user. It consists of several subcomponents, most notably the `Parser` and `Command` class. `Logic` also prepares the information to be used by the `UI` to display to the user. 
+
+The following diagram represents the structure of the `Logic` component  
+<br><img src="images/LogicComponentClassDiagram.jpg" width="800"><br> 
+
+Here are some of the key files in the `Logic` component:
+- [`Logic.java`](../src/main/java/seedu/doist/logic/Logic.java):  contains an `interface` that defines operations to obtain the results of computations.  
+    These operations are defined using different methods (API).  
+    Some representative methods are listed here:  
+    ```java  
+    - CommandResult execute(String commandText) throws CommandException;
+    - ObservableList<ReadOnlyTask> getFilteredPersonList();  
+    ```  
+- `LogicManager.java`: contains a `class` that implements the operations specified in `Model.java`.
+- `Parser.java`: contains a `class` that is in charge of parsing commands.
+- `Command.java`: contains a `class` that represents each command defined in Doist.
+
+### 4. Model component
+The `Model` component defines classes that represent the data Doist operates on. It also specifies and implements operations that work on the data.  
+  
+The following diagram represents the structure of the `Model` component  
+<br><img src="images/ModelClassDiagram.png" width="800"><br>  
+
+Here are some of the key files in the `Model` component:
+- [`Model.java`](../src/main/java/seedu/doist/model/Model.java):  contains an `interface` that defines multiple operations on the data.  
+    These operations are defined using different methods (API).  
+    Some representative methods are listed here:  
+    ```java  
+    - void finishTask(ReadOnlyTask target) throws UniqueTaskList.TaskNotFoundException, UniqueTaskList.TaskAlreadyFinishedException;
+    - void addTask(Task task) throws UniqueTaskList.DuplicateTaskException;
+    - void deleteTask(ReadOnlyTask target) throws UniqueTaskList.TaskNotFoundException;  
+    ```  
+- `ModelManager.java`: contains a `class` that implements the operations specified in `Model.java`.
+- `TodoList.java`: contains a `class` that represents the to-do list.
+- `Task.java`: contains a `class` that represents each to-do list item (i.e. task).
+- `UserPrefs.java`: contains a class that stores user preferences such as the position and size of the app window.
+
+### 5. Storage component
+The `Storage` component takes charge of reading and writing (R/W) data, to and from the hard drive.
+This data consists of **user preferences** and **to-do list** :
+- **user preferences** is stored in a **JSON** file.
+- **to-do list** is stored in a **XML** file.
+
+The following diagram represents the structure of the `Storage` component  
+<br><img src="images/StorageClassDiagram.png" width="800"><br>  
+
+Here are some of the key files in the `Storage` component:
+- [`Storage.java`](../src/main/java/seedu/doist/storage/StorageManager.java):  contains an `interface` that defines R/W operations on **user preferences** and **to-do list**.  
+    These operations are defined using different methods (API).  
+    Some representative methods are listed here:  
+    ```java  
+    - Optional<UserPrefs> readUserPrefs() throws DataConversionException, IOException;
+    - void saveUserPrefs(UserPrefs userPrefs) throws IOException;
+    - Optional<ReadOnlyTodoList> readTodoList() throws DataConversionException, IOException;
+    - void saveTodoList(ReadOnlyTodoList todoList) throws IOException;  
+    ```  
+- `StorageManager.java`: contains a `class` that implements the operations specified in `Storage.java`.
+- `XmlTodoListStorage`: contains a `class` that implements the R/W operations on **to-do list**. An instance of this class is utilized in `StorageManager`.
+- `JsonUserPrefsStorage`: contains a `class` that implements the R/W operations on **user preferences**. An instance of this class is used in `StorageManager`.
+
+<br>
+
+
+## Implementation
+
+### 1. Logging
+
+We are using `java.util.logging` package for logging. The `LogsCenter` class is used to manage the logging levels
+and logging destinations.
+
+* The logging level can be controlled using the `logLevel` setting in the configuration file
+  (See [Configuration](#configuration))
+* The `Logger` for a class can be obtained using `LogsCenter.getLogger(Class)` which will log messages according to
+  the specified logging level
+* Currently log messages are output through: `Console` and to a `.log` file.
+
+**Logging Levels**
+
+* `SEVERE` : Critical problem detected which may possibly cause the termination of the application
+* `WARNING` : Can continue, but with caution
+* `INFO` : Information showing the noteworthy actions by the App
+* `FINE` : Details that is not usually noteworthy but may be useful in debugging
+  e.g. print the actual list instead of just its size
+
+### 2. Configuration
+
+Certain properties of the application can be controlled (e.g App name, logging level) through the configuration file
+(default: `config.json`):
+
+<br>
+
+
+## Testing
+
+Tests can be found in the `./src/test/java` folder.
+
+### Types of tests
+
+#### 1. GUI Tests 
+These are _System Tests_ that test the entire App by simulating user actions on the GUI.
+   These are in the `guitests` package.
+> ##### *Headless GUI Testing*
+> Thanks to the [TestFX](https://github.com/TestFX/TestFX) library we use,
+ our GUI tests can be run in the _headless_ mode.
+ In the headless mode, GUI tests do not show up on the screen.
+ That means the developer can do other things on the Computer while the tests are running.
+ See [UsingGradle.md](UsingGradle.md#running-tests) to learn how to run tests in headless mode.
+
+#### 2. Non-GUI Tests
+These are tests not involving the GUI. They include,
+   1. _Unit tests_ targeting the lowest level methods/classes. <br>
+      e.g. `seedu.address.commons.UrlUtilTest`
+   2. _Integration tests_ that are checking the integration of multiple code units
+     (those code units are assumed to be working).<br>
+      e.g. `seedu.address.storage.StorageManagerTest`
+   3. Hybrids of unit and integration tests. These test are checking multiple code units as well as
+      how the are connected together.<br>
+      e.g. `seedu.address.logic.LogicManagerTest`
+
+### How to test
+#### 1. In Eclipse
+
+* To run all tests, right-click on the `src/test/java` folder and choose
+  `Run As` > `JUnit Test`
+* To run a subset of tests, you can right-click on a test package, test class, or a test and choose to run as a JUnit test.
+
+#### 2. Using Gradle
+
+* See [UsingGradle.md](UsingGradle.md) for how to run tests using Gradle.
+
+
+### Troubleshooting tests
+ - **Problem**: Tests fail because NullPointException when AssertionError is expected  
+    - *Reason*: Assertions are not enabled for JUnit tests.
+   This can happen if you are not using a recent Eclipse version (i.e. _Neon_ or later)  
+    - *Solution*: Enable assertions in JUnit tests as described [here](http://stackoverflow.com/questions/2522897/eclipse-junit-ea-vm-option).  
+    Delete run configurations created when you ran tests earlier.
+
+<br>
+
+
+## Dev Ops
+
+### 1. Build Automation
+
+You can learn how to use Gradle for build automation from [UsingGradle.md](UsingGradle.md).
+
+### 2. Continuous Integration
+
+We use [Travis CI](https://travis-ci.org/) and [AppVeyor](https://www.appveyor.com/) to perform _Continuous Integration_ on our projects.
+You can read [UsingTravis.md](UsingTravis.md) and [UsingAppVeyor.md](UsingAppVeyor.md) for more details.
+
+### 3. Publishing Documentation
+
+You can learn how to use GitHub Pages to publish documentation to the project site from [UsingGithubPages.md](UsingGithubPages.md).
+
+### 4. Making a Release
+
+Here are the steps to create a new release.
+
+ 1. Generate a JAR file [using Gradle](UsingGradle.md#creating-the-jar-file).
+ 2. Tag the repo with the version number. e.g. `v0.1`
+ 2. [Create a new release using GitHub](https://help.github.com/articles/creating-releases/) and upload the JAR file you created.
+
+### 5. Managing Dependencies
+
+Doist depends on third-party libraries, such as [Jackson library](http://wiki.fasterxml.com/JacksonHome) for XML parsing, [Natty](http://natty.joestelmach.com) for date and time parsing.  
+Managing these _dependencies_ has been automated using Gradle. Gradle can download the dependencies automatically, which is better than these alternatives.Therefore, there is no need to include those libraries in the repo, which will bloat the repo size, or download those libraries manually, which reates extra work for developers. To add new 3-party libraries, update `build.gradle`.
+
+<br>
+
+
+## Appendix A : User Stories
+
+Priorities: High (must have) - `* * *`, Medium (nice to have)  - `* *`,  Low (unlikely to have) - `*`
+
+Priority | As a ... | I want to ... |So that I can ...
+-------- | :------- | :------------ | :-----------
+**`* * *`** | user | create a new task with a optional start time, optional end time, optional reminder time, optional recurrence interval and ranked priority | create an priortised event, deadline or a floating task that might be recurring
+**`* * *`** | user | view the details of a task | see details of a task such as recurrance interval
+**`* * *`** | user | see a list of pending, overdue or finished tasks separately
+**`* * *`** | user | edit task properties
+**`* * *`** | user | mark a task as "Finished"
+**`* * *`** | user with many tasks |  find tasks using keywords (appearing in titles or in description) | easily find the task
+**`* * *`** | user | view all commands that I can use with detailed instructions, including examples
+**`* * *`** | user that makes mistakes | undo my last action(s) | revert to the previous state
+**`* * *`** | user | delete multiple tasks at the same time by their indices
+**`* * *`** | user | change the storage directory (path) | decide where the storage file will be saved
+**`* *`** | user | delete all tasks listed under a tag
+**`* *`** | user | create or delete a new tag
+**`* *`** | user | add or delete tags for a specific task | better filter the tasks
+**`* *`** | user | see a list of tasks within a specified time interval
+**`* *`** | user | see a list of all tasks with a specific tag | filter tasks by tag
+**`* *`** | user |  recover a certain task in the "Trash Bin"
+**`* *`** | user | use arrow key to see the previous commands I execute | I can re-execute the past commands conveniently without manually typing them
+**`* *`** | user | I want an error message to appear at the feedback textbox | I know what error occured
+**`*`** | user | rename existing commands | customise to the ones I am more used to
+**`*`** | user | reset all changes to existing commands | return to using the default commands
+**`*`** | user | I want the keywords in the command to be highlighted
+**`*`** | user | I want the auto-completion / content-assistant of the keywords when I am typing
+**`*`** | user | create a new task by entering the date in a "natural language" way | it feels more natural when typing
+**`*`** | user | see my "Trash Bin" that consists of deleted tasks | view and/or recover them
+**`*`** | user | see my tasks on Google Calendar | integrate tasks with Google Calendar
+
+<br>
+
+
+## Appendix B : Use Cases
+
+(For all use cases below, the System is Doist and the Actor is the user, unless specified otherwise)
+
+### Use Case: Add a new task
+
+**MSS**
+
+1. User types in the command for adding a new task and specifies the parameters.
+2. Doist adds a new task, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. The given input is invalid
+
+> 2b1. Doist shows an error message
+  Use case ends
+
+### Use Case: List all tasks
+
+**MSS**
+
+1. User types in the command to list tasks
+2. Doist list tasks, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. There are no tasks currently stored
+
+> 2b1. Doist shows an appropriate message
+  Use case ends
+
+
+### Use Case: Edit an existing task
+
+**MSS**
+
+1. User types in the command to edit a task
+2. Doist updates the task, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. The task does not exist
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+2c. The new properties are invalid
+> 2c1. Doist shows and appropriate message
+> Use case ends
+
+### Use Case: Delete a task
+
+**MSS**
+
+1. User types in the command to delete a task
+2. Doist deletes the task, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. The task does not exist
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+### Use Case: Undo a command
+
+**MSS**
+
+1. User types in the command to undo the previous mutating command
+2. Doist performs the undo, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. There is no previous mutating command
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+### Use Case: Mark task as finished
+
+**MSS**
+
+1. User types in the command to mark a task as finished
+2. Doist marks the task as finished, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. Task is already finished
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+### Use Case: Find a task
+
+**MSS**
+
+1. User types in the command to find a task
+2. Doist shows the task, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. The task does not exist
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+2c. There are multiple potential matches
+
+>2c1. Show all possible matches
+>Use case ends
+
+### Use Case: Change file storage location
+
+**MSS**
+
+1. User types in the command to change file storage location
+2. Doist shows the task, and displays a success message
+
+Use case ends.
+
+**Extensions**
+
+2a. The command format is invalid
+
+>2a1. Doist shows an error message
+>Use case ends
+
+2b. The specified file path is invalid
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+2c. There already exists a file (that is not a valid storage file) with the same name at that path
+
+> 2b1. Doist shows an appropriate message
+> Use case ends
+
+<br>
+
+
+## Appendix C : Non Functional Requirements
+
+- The project should work on any mainstream OS as long as it has Java 8 or higher installed
+- It is a desktop app
+- Have multiple UI themes
+- Come with automated unit tests
+- Be able to hold up to 1000 tasks
+- Run fast enough by responding to a user's command on the command line interface within 5 secs
+- Be open source
+- Have flexible commands that accept variations
+- Allow user to customise default commands
+- Show tags and priority of tasks in a user-friendly, obvious way
+- Allow user to change storage folder directory
+- Mouse actions should have keyboard alternatives and typing is preferred over key combinations. Command-line is the best choice of input
+- Commands should be easy to learn.
+- The data should be stored locally in the form of a human editable text file
+- The software should work without requiring an installer
+- Send reminders by pop-ups
+- Can have tasks across days, weeks, months, years, centuries...
+
+See the rest of the NFRs at:
+http://www.comp.nus.edu.sg/~cs2103/AY1617S2/contents/handbook.html#handbook-project-constraints
+
+<br>
+
+
+## Appendix D : Glossary
+**Task**
+- Properties
+    - `Description`
+    - `Priority`
+    - `Start time` (optional)
+    - `End time` (optional)
+    - `Reminder time` (optional)
+    - `Recurrence interval` (optional)
+    - `isFinished` (default false)
+    - `Tags` (can be empty)
+- About the properties
+    - `Priority`
+    There are three priorities: High, Medium, Low. By default, tasks are low priority.
+    - `Tags`
+    Tags are independent of tasks. Tags and tasks have a many-to-many relationship where zero or more tags can be added to a task and zero or more tasks can be listed under a tag
+    - `Recurrence interval`
+    Specifies the interval at which user wants to be reminded of a recurring task
+- Special Types
+    - `Event`
+    A task with different `start time` and `end time`. It represents tasks to be carried out over a period of time
+    - `Deadline`
+    A task with the same `start time` and `end time`. It represents tasks that have to be done before a specific time
+    - `Floating task`
+    A task with no `start time` and `end time`. It represents tasks that are not associated with any timing. It can only be `pending` and `finished`, never `overdue`.
+    - `Pending tasks`
+    Tasks that have not been `finished` nor `ended`
+    - `Overdue tasks`
+    Tasks that have `ended` but not been `finished`
+    - `Finished tasks`
+    Tasks that have been `finished`
+    - `Recurring task`
+    A task with a `recurrence interval` set. A new task will automatically be cloned from this task, with the recurrence interval added to the task's `start time`, `end time` and `reminder time` when a task is marked as `Finished` or becomes `Overdue`
+
+**R/W**
+    Reading and Writing
+
+**Mutating Command**
+    Any command which causes a change in the state of apps (E.g. add, delete, finished)
+
+**Mainstream OS**
+    Windows, Linux, Unix, OS-X
+
+<br>
+
+
+## Appendix E : Product Survey
+
+**Remember the Milk**
+
+Author: Lee Yan Hwa
+
+Pros:
+
+* Almost "natural language" command-line interface to enter tasks
+* Neat UI to display tasks and view different types of tasks (Finished, Overdue, Not finished, Due today, Tomorrow, This Week, Trash)
+* Tasks are automatically added to Smart Lists according to criterias set by user
+* Has subtasks
+* Has all the normal features of a task manager such as due-date, mark as finished, notes, priority, different sorting methods, tagging, postponing, recurring tasks
+* Able to share tasks and collaborate with others
+* Available for use on many different platforms (Mobile, PC)
+
+
+Cons:
+
+* Some of the best features like subtasks is pro-only
+* Doesn't have support for handwritten tasks, drawings, images, calendar view
+* Reminder timing cannot be customised
+* No attachment of files
+
+**Wunderlist**
+
+Author:  Ram Janarthan
+
+Pros:
+
+* Has a good user interface that feels nice to use
+* Can provide context for each tasks, by allowing attachment of files
+* Easy sharing for multiple users, supports collaboration very well
+* Allows for subtasks, and also reminders for tasks
+* Tasks are very user-customisable
+* Automatically fixes reminders if it detects dates in the input
+* Available for use on many different platforms (Mobile, PC)
+
+
+Cons:
+
+* Pro version is quite expensive
+* There is no dedicated 'Sync' button
+* Setup is a bit lengthy, and may require you to download the mobile version as well
+
+
+
+
+**Google tasks**
+
+Author: Yuyang Luo
+
+Pros:
+
+* It is integrated with Google Calendar, so you can check your tasks in the Calendar view
+* There is support for groups (assign tasks into groups)
+* Users can sort tasks in chronological order
+
+
+
+Cons:
+
+* There is no official mobile apps (neither for Android nor iOS)
+* Only support plain text
+* The webapp UI is not well-designed
+* There is no support for labels
+* There is no support for task priority in the official webapp (some third-party apps add this feature)
+* Almost all the third-party mobile apps are paid
+* There is no support for reminder in the official webapp (some third-party apps add this feature)
+* Users can only set the deadline, which is a date for the task, cannot set the specific time
+* There is no support for searching feature
+
+**Google Keep**
+
+Author: Yuyang Luo
+
+Pros:
+
+* Cross-platform: chrome extension, mobile app for iOS and Android, web app
+* The interface are well-designed (similar to sticky notes)
+* There is support for labels
+* Users can pin certain notes or reminders to be shown at the top
+* Can insert images and hand-drawing
+* Users can search for notes and reminders
+
+
+Cons:
+
+* There is no support for priority
+* There is no support for sorting (by priority, by deadline)
